@@ -135,6 +135,7 @@
             <pre class="config-value"><code>{
   "mcpServers": {
     "{{ server_name|lower }}": {
+      "type": "streamable-http",
       "url": "{{ mcp_url }}",
       "headers": {
         "Authorization": "Bearer {{ jwt_token }}"

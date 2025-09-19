@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     "kubediag",
+    version="1.0",
     auth=JWTVerifier(
         public_key=SECRET_KEY,
         algorithm="HS256",
