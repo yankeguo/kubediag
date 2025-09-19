@@ -23,6 +23,9 @@ def _create_configuration() -> Configuration:
             logger.error("Failed to load Kubernetes configuration: %s", e)
             raise Exception("Could not load Kubernetes configuration") from e
     if os.getenv("KUBERNETES_INSECURE", "false").lower() == "true":
+        import urllib3
+
+        urllib3.disable_warnings()
         cfg.verify_ssl = False
     return cfg
 
