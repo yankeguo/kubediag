@@ -35,7 +35,7 @@ class KubernetesListResponse(BaseModel):
 def kubernetes_list(
     resource_type: Annotated[
         str,
-        "Kubernetes resource type in plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
+        "Kubernetes resource type in lowercase plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
     ],
     namespace: Optional[
         Annotated[
@@ -97,7 +97,7 @@ def kubernetes_list(
 def kubernetes_get(
     resource_type: Annotated[
         str,
-        "Kubernetes resource type in plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
+        "Kubernetes resource type in lowercase plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
     ],
     name: Annotated[str, "Name of the Kubernetes resource"],
     namespace: Optional[
