@@ -10,4 +10,4 @@ if [ -f .env ]; then
 	source .env
 fi
 
-exec uvicorn --reload main:app
+exec uvicorn --reload kubediag.main:app

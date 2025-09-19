@@ -1,0 +1,40 @@
+{
+    "_type": "Resource",
+    "prefix": "api",
+    "group": "",
+    "api_version": "v1",
+    "kind": "PersistentVolume",
+    "namespaced": false,
+    "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+    ],
+    "name": "persistentvolumes",
+    "preferred": true,
+    "singularName": "persistentvolume",
+    "shortNames": [
+        "pv"
+    ],
+    "categories": null,
+    "subresources": {
+        "status": {
+            "kind": "PersistentVolume",
+            "name": "persistentvolumes/status",
+            "subresource": "status",
+            "namespaced": false,
+            "verbs": [
+                "get",
+                "patch",
+                "update"
+            ],
+            "singularName": ""
+        }
+    },
+    "storageVersionHash": "HN/zwEC+JgM="
+}
