@@ -44,16 +44,42 @@ def get_resource_api(resource_type: str) -> Optional[Any]:
     try:
         all_resources = dynamic_client.resources.search()
 
-        matching_resources = [
-            resource for resource in all_resources if resource.name == resource_type
-        ]
+        matching_resources = []
+        for resource in all_resources:
+            try:
+                # Safely check if the resource name matches, handling malformed resources
+                if hasattr(resource, "name") and resource.name == resource_type:
+                    matching_resources.append(resource)
+            except Exception as e:
+                # Log and skip malformed or inaccessible resources
+                logger.debug("Skipping malformed resource during discovery: %s", e)
+                continue
 
         if not matching_resources:
             _resource_api_cache[resource_type] = None
             logger.error("Resource type %s not found in the cluster", resource_type)
             return None
 
-        resource = matching_resources[0]
+        # Prefer core Kubernetes resources over custom resources when there are multiple matches
+        # Core resources have empty group ('') and standard API versions like 'v1', 'v1beta1'
+        preferred_resource = None
+        for resource in matching_resources:
+            try:
+                # Check if this is a core Kubernetes resource (empty group)
+                if hasattr(resource, "group") and resource.group == "":
+                    preferred_resource = resource
+                    break
+                # If no core resource found yet, use the first valid one as fallback
+                elif preferred_resource is None:
+                    preferred_resource = resource
+            except Exception as e:
+                logger.debug(
+                    "Error checking resource properties for %s: %s", resource_type, e
+                )
+                continue
+
+        # Use the preferred resource or fallback to the first one
+        resource = preferred_resource or matching_resources[0]
 
         _resource_api_cache[resource_type] = resource
 
