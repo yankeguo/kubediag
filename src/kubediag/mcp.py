@@ -22,7 +22,7 @@ mcp = FastMCP(
 
 class KubernetesListResponse(BaseModel):
     class ResourceType(BaseModel):
-        api_group: str
+        group: str
         api_version: str
         name: str
 
@@ -74,7 +74,7 @@ def kubernetes_list(
         )
         return KubernetesListResponse(
             resource_type=KubernetesListResponse.ResourceType(
-                api_group=api_group,
+                group=api_group,
                 api_version=api_version,
                 name=resource_name,
             ),
