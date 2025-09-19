@@ -5,7 +5,7 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -14,30 +14,22 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("kubediag", stateless_http=True)
 
 
-# Pydantic models for tool requests with descriptions
-class KubernetesListRequest(BaseModel):
-    """Request model for listing Kubernetes resources"""
+# Pydantic models for tool responses
+class KubernetesListResponse(BaseModel):
+    """Response model for listing Kubernetes resources"""
 
-    namespace: Optional[str] = Field(
-        default="default", description="Target namespace for listing resources"
-    )
-    resource_type: Optional[str] = Field(
-        default="pods",
-        description="Kubernetes resource type to list (e.g., pods, services, deployments, configmaps, secrets, jobs, cronjobs, daemonsets, statefulsets, ingresses)",
-    )
+    api_group: str
+    api_version: str
+    resource_name: str
+    names: List[str]
+    namespace: str
 
 
-class KubernetesGetRequest(BaseModel):
-    """Request model for getting details of a specific Kubernetes resource"""
+class KubernetesGetResponse(BaseModel):
+    """Response model for getting Kubernetes resource details"""
 
-    namespace: Optional[str] = Field(
-        default="default", description="Target namespace where the resource is located"
-    )
-    resource_type: Optional[str] = Field(
-        default="pods",
-        description="Kubernetes resource type (e.g., pods, services, deployments, configmaps, secrets, jobs, cronjobs, daemonsets, statefulsets, ingresses)",
-    )
-    name: str = Field(description="Name of the specific resource to get details for")
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
 
 # Initialize Kubernetes client with in-cluster auto configuration
@@ -178,19 +170,6 @@ def clean_resource_object(obj: Any, resource_type: str) -> Dict[str, Any]:
     return _truncate_deep(result)
 
 
-def _create_empty_response(
-    resource_type: str, namespace: str
-) -> Dict[str, Union[str, List[str]]]:
-    """Create an empty response structure for list operations"""
-    return {
-        "api_group": "",
-        "api_version": "",
-        "resource_name": resource_type,
-        "names": [],
-        "namespace": namespace,
-    }
-
-
 def _extract_resource_info(
     resource_api: Any, resource_type: str
 ) -> tuple[str, str, str]:
@@ -209,22 +188,12 @@ def _extract_resource_names(result: Any) -> List[str]:
         return [result.metadata.name] if hasattr(result, "metadata") else []
 
 
-@mcp.tool()
-def kubernetes_list(request: KubernetesListRequest) -> Dict[str, Union[str, List[str]]]:
-    """List Kubernetes resources of specified type in a namespace
-
-    Returns detailed information about the resolved resource type along with
-    the list of resource names in the specified namespace.
-    Supports any Kubernetes resource type with automatic discovery.
-
-    Args:
-        request: Request containing namespace and resource_type
-
-    Returns:
-        Dictionary containing api_group, api_version, resource_name, names list, and namespace
-    """
-    resource_type = (request.resource_type or "pods").lower()
-    namespace = request.namespace or "default"
+@mcp.tool(description="List Kubernetes resources of specified type in a namespace")
+def kubernetes_list(
+    namespace: Optional[str] = "default", resource_type: Optional[str] = "pods"
+) -> KubernetesListResponse:
+    resource_type = (resource_type or "pods").lower()
+    namespace = namespace or "default"
 
     try:
         # Get the appropriate API resource
@@ -233,7 +202,13 @@ def kubernetes_list(request: KubernetesListRequest) -> Dict[str, Union[str, List
         if not resource_api:
             # Return response with empty names list if resource not found
             logger.warning("Resource type '%s' not found in cluster", resource_type)
-            return _create_empty_response(resource_type, namespace)
+            return KubernetesListResponse(
+                api_group="",
+                api_version="",
+                resource_name=resource_type,
+                names=[],
+                namespace=namespace,
+            )
 
         # Extract resource information
         api_group, api_version, resource_name = _extract_resource_info(
@@ -255,13 +230,13 @@ def kubernetes_list(request: KubernetesListRequest) -> Dict[str, Union[str, List
             resource_type,
             namespace,
         )
-        return {
-            "api_group": api_group,
-            "api_version": api_version,
-            "resource_name": resource_name,
-            "names": names,
-            "namespace": namespace,
-        }
+        return KubernetesListResponse(
+            api_group=api_group,
+            api_version=api_version,
+            resource_name=resource_name,
+            names=names,
+            namespace=namespace,
+        )
 
     except ApiException as e:
         logger.error(
@@ -270,7 +245,13 @@ def kubernetes_list(request: KubernetesListRequest) -> Dict[str, Union[str, List
             namespace,
             e.reason,
         )
-        return _create_empty_response(resource_type, namespace)
+        return KubernetesListResponse(
+            api_group="",
+            api_version="",
+            resource_name=resource_type,
+            names=[],
+            namespace=namespace,
+        )
     except Exception as e:
         logger.error(
             "Unexpected error listing %s in namespace %s: %s",
@@ -278,28 +259,22 @@ def kubernetes_list(request: KubernetesListRequest) -> Dict[str, Union[str, List
             namespace,
             e,
         )
-        return _create_empty_response(resource_type, namespace)
+        return KubernetesListResponse(
+            api_group="",
+            api_version="",
+            resource_name=resource_type,
+            names=[],
+            namespace=namespace,
+        )
 
 
-@mcp.tool()
-def kubernetes_get(request: KubernetesGetRequest) -> Dict[str, Any]:
-    """Get details of a specific Kubernetes resource with data cleaning
-
-    Returns cleaned resource details with:
-    - Metadata filtered to essential fields only
-    - Secret values redacted (replaced with "REDACTED")
-    - Long values truncated to 256 characters with length info
-    - Internal Kubernetes annotations removed
-
-    Supports any Kubernetes resource type with automatic discovery.
-
-    Args:
-        request: Request containing namespace, resource_type, and name
-
-    Returns:
-        Dictionary containing cleaned resource data or error information
-    """
-    resource_type = (request.resource_type or "pods").lower()
+@mcp.tool(description="Get details of a specific Kubernetes resource")
+def kubernetes_get(
+    name: str,
+    namespace: Optional[str] = "default",
+    resource_type: Optional[str] = "pods",
+) -> KubernetesGetResponse:
+    resource_type = (resource_type or "pods").lower()
 
     try:
         # Get the appropriate API resource
@@ -308,13 +283,13 @@ def kubernetes_get(request: KubernetesGetRequest) -> Dict[str, Any]:
         if not resource_api:
             error_msg = f"Resource type '{resource_type}' not found in cluster"
             logger.error(error_msg)
-            return {"error": error_msg}
+            return KubernetesGetResponse(error=error_msg)
 
         # Get the specific resource
         if hasattr(resource_api, "namespaced") and resource_api.namespaced:
-            result = resource_api.get(name=request.name, namespace=request.namespace)
+            result = resource_api.get(name=name, namespace=namespace)
         else:
-            result = resource_api.get(name=request.name)
+            result = resource_api.get(name=name)
 
         # Clean the original resource object according to the rules
         cleaned_result = clean_resource_object(result, resource_type)
@@ -324,23 +299,23 @@ def kubernetes_get(request: KubernetesGetRequest) -> Dict[str, Any]:
             logger.info(
                 "Retrieved %s '%s' from namespace %s",
                 resource_type,
-                request.name,
-                request.namespace,
+                name,
+                namespace,
             )
-            return cleaned_result
+            return KubernetesGetResponse(data=cleaned_result)
         elif cleaned_result is None:
-            return {"error": "No data returned from resource"}
+            return KubernetesGetResponse(error="No data returned from resource")
         else:
-            return {"data": str(cleaned_result)}
+            return KubernetesGetResponse(data={"data": str(cleaned_result)})
 
     except ApiException as e:
-        error_msg = f"Error getting {resource_type} '{request.name}': {e.reason}"
+        error_msg = f"Error getting {resource_type} '{name}': {e.reason}"
         logger.error(error_msg)
-        return {"error": error_msg}
+        return KubernetesGetResponse(error=error_msg)
     except Exception as e:
-        error_msg = f"Error getting {resource_type} '{request.name}': {str(e)}"
+        error_msg = f"Error getting {resource_type} '{name}': {str(e)}"
         logger.error(error_msg)
-        return {"error": error_msg}
+        return KubernetesGetResponse(error=error_msg)
 
 
 if __name__ == "__main__":
