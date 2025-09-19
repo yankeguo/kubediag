@@ -71,21 +71,6 @@
             line-height: 1.4;
         }
 
-        .copy-button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-
-        .copy-button:hover {
-            background-color: #2980b9;
-        }
-
         .instructions {
             background-color: #fff3cd;
             border: 1px solid #ffeaa7;
@@ -131,7 +116,6 @@
             <div class="config-item">
                 <div class="config-label">MCP 服务器地址：</div>
                 <div class="config-value mcp-url">{{ mcp_url }}</div>
-                <button class="copy-button" onclick="copyToClipboard('{{ mcp_url }}')">复制地址</button>
             </div>
 
             <div class="config-item">
@@ -142,8 +126,6 @@
             <div class="config-item">
                 <div class="config-label">HTTP 授权头：</div>
                 <div class="config-value jwt-token">Authorization: Bearer {{ jwt_token }}</div>
-                <button class="copy-button"
-                    onclick="copyToClipboard('Authorization: Bearer {{ jwt_token }}')">复制授权头</button>
             </div>
         </div>
 
@@ -160,8 +142,6 @@
     }
   }
 }</code></pre>
-            <button class="copy-button"
-                onclick="copyToClipboard(this.parentElement.querySelector('code').textContent)">复制配置</button>
         </div>
 
         <div style="margin-top: 30px; text-align: center; color: #6c757d;">
@@ -170,24 +150,6 @@
     </div>
 
     <script>
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(function () {
-                // 创建临时提示
-                const button = event.target;
-                const originalText = button.textContent;
-                button.textContent = '已复制！';
-                button.style.backgroundColor = '#28a745';
-
-                setTimeout(function () {
-                    button.textContent = originalText;
-                    button.style.backgroundColor = '#3498db';
-                }, 2000);
-            }).catch(function (err) {
-                console.error('复制失败: ', err);
-                alert('复制失败，请手动复制');
-            });
-        }
-
         // 静默去除 URL 中的 ticket 参数，避免刷新页面时重复认证
         function removeTicketFromURL() {
             const url = new URL(window.location.href);
