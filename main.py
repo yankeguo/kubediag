@@ -21,9 +21,12 @@ mcp = FastMCP("kubediag", stateless_http=True)
 class KubernetesListResponse(BaseModel):
     """Response model for listing Kubernetes resources"""
 
-    resource_api_group: str
-    resource_api_version: str
-    resource_type: str
+    class ResourceType(BaseModel):
+        api_group: str
+        api_version: str
+        name: str
+
+    resource_type: ResourceType
     names: List[str]
     namespace: str
 
@@ -105,9 +108,9 @@ def get_resource_api(resource_type: str) -> Optional[Any]:
                     "subresource": "status",
                     "namespaced": false,
                     "verbs": [
-                    "get",
-                    "patch",
-                    "update"
+                        "get",
+                        "patch",
+                        "update"
                     ],
                     "singularName": ""
                 }
@@ -126,11 +129,13 @@ def get_resource_api(resource_type: str) -> Optional[Any]:
             # If resource_type is singular, also try plural
             search_terms.append(resource_type.lower() + "s")
 
+        print(search_terms)
+
         matching_resources = [
-            resource
-            for resource in all_resources
-            if resource.name.lower() in search_terms
+            resource for resource in all_resources if resource.name in search_terms
         ]
+
+        print(matching_resources)
 
         if not matching_resources:
             logger.warning("No matching resources found for type: %s", resource_type)
@@ -248,9 +253,11 @@ def kubernetes_list(
         str,
         "Kubernetes resource type in plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
     ],
-    namespace: Annotated[
-        str,
-        "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
+    namespace: Optional[
+        Annotated[
+            str,
+            "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
+        ]
     ] = "default",
 ) -> KubernetesListResponse:
     resource_type = (resource_type or "pods").lower()
@@ -287,9 +294,11 @@ def kubernetes_list(
             namespace,
         )
         return KubernetesListResponse(
-            resource_api_group=api_group,
-            resource_api_version=api_version,
-            resource_type=resource_name,
+            resource_type=KubernetesListResponse.ResourceType(
+                api_group=api_group,
+                api_version=api_version,
+                name=resource_name,
+            ),
             names=names,
             namespace=namespace,
         )
@@ -313,9 +322,11 @@ def kubernetes_get(
         "Kubernetes resource type in plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
     ],
     name: Annotated[str, "Name of the Kubernetes resource"],
-    namespace: Annotated[
-        str,
-        "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
+    namespace: Optional[
+        Annotated[
+            str,
+            "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
+        ]
     ] = "default",
 ) -> KubernetesGetResponse:
     resource_type = (resource_type or "pods").lower()
