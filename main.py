@@ -206,7 +206,7 @@ def clean_resource_object(obj: Any, resource_type: str) -> Dict[str, Any]:
             if field in original_metadata:
                 cleaned_metadata[field] = original_metadata[field]
 
-        # Clean annotations - remove internal Kubernetes fields
+        # Clean annotations - remove internal Kubernetes fields and useless information
         if "annotations" in original_metadata and original_metadata["annotations"]:
             cleaned_annotations = {
                 key: value
@@ -214,6 +214,18 @@ def clean_resource_object(obj: Any, resource_type: str) -> Dict[str, Any]:
                 if not (
                     key.startswith("kubectl.kubernetes.io/")
                     or key.startswith("kubernetes.io/")
+                    or key == "kubectl.kubernetes.io/last-applied-configuration"
+                    or key.endswith("/last-applied-configuration")
+                    or key == "deployment.kubernetes.io/revision"
+                    or key.startswith("deployment.kubernetes.io/")
+                    or key.startswith("pod-template-generation")
+                    or key.startswith("autoscaling.")
+                    or key.startswith("control-plane.")
+                    or key.startswith("deployment.")
+                    or key.startswith("job.")
+                    or key.startswith("batch.")
+                    or key.startswith("meta.helm.sh/")
+                    or key.startswith("helm.sh/")
                 )
             }
             if cleaned_annotations:  # Only add if not empty
