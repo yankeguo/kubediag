@@ -1,8 +1,16 @@
 import logging
-from typing import Any, Dict, List, Optional, Union, Annotated
-
+from typing import Any, Dict, List, Optional, Annotated
+from urllib.parse import urlencode
 import os
-import json
+import jwt
+import datetime
+import aiohttp
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+from starlette.applications import Starlette
+from starlette.routing import Mount, Route
+from starlette.requests import Request
+from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse
+from starlette.middleware import Middleware
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
@@ -14,7 +22,20 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("kubediag", stateless_http=True)
+SECRET_KEY = os.getenv("SECRET_KEY", "secret_key")
+
+PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:8000")
+
+CAS_URL = os.getenv("CAS_URL", "http://localhost:8000/cas")
+
+
+mcp = FastMCP(
+    "kubediag",
+    auth=JWTVerifier(
+        public_key=SECRET_KEY,
+        algorithm="HS256",
+    ),
+)
 
 
 # Pydantic models for tool responses
@@ -386,5 +407,76 @@ def kubernetes_get(
         raise ToolError(error_msg) from e
 
 
-if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+mcp_app = mcp.streamable_http_app(path="/")
+
+
+class CASResponse(BaseModel):
+    """
+      {
+    "serviceResponse" : {
+      "authenticationSuccess" : {
+        "user" : "20150402007",
+    """
+
+    class _ServiceResponse(BaseModel):
+        class _AuthenticationSuccess(BaseModel):
+            user: str
+
+        authenticationSuccess: _AuthenticationSuccess
+
+    serviceResponse: _ServiceResponse
+
+
+async def route_index(req: Request):
+    ticket = req.query_params.get("ticket", None)
+    if not ticket:
+        query = urlencode({"service": PUBLIC_URL})
+        return RedirectResponse(f"{CAS_URL}?{query}")
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"{CAS_URL}/p3/serviceValidate",
+            params={"service": PUBLIC_URL, "ticket": ticket, "format": "json"},
+        ) as resp:
+            data = CASResponse(**await resp.json(content_type=None))
+
+    user_id = data.serviceResponse.authenticationSuccess.user
+
+    # Generate JWT token
+    payload = {
+        "sub": user_id,
+    }
+
+    jwt_token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+    logger.info(f"CAS authentication successful for user: {user_id}")
+
+    # Return plain text instructions for MCP server usage
+    instructions = f"""✅ CAS 认证成功！
+
+认证用户: {user_id}
+
+使用 KubeDiag MCP 服务器的方法:
+
+1. 配置 MCP 服务器地址: 
+
+{PUBLIC_URL}/mcp/
+
+协议为 Streamable HTTP
+
+2. 配置 HTTP 授权头 
+
+Authorization: Bearer {jwt_token}
+
+"""
+
+    return PlainTextResponse(instructions)
+
+
+app = Starlette(
+    routes=[
+        Mount("/mcp", mcp_app),
+        Route("/", route_index),
+    ],
+    lifespan=mcp_app.lifespan,
+)

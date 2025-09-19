@@ -5,6 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aiohttp[speedups]>=3.12.15",
     "fastmcp>=2.12.3",
     "kubernetes>=33.1.0",
+    "starlette>=0.48.0",
+    "uvicorn>=0.35.0",
+    "pyjwt>=2.10.0",
 ]
