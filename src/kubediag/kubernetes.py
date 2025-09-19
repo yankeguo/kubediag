@@ -2,19 +2,22 @@ import logging
 from typing import Any, Dict, Optional, List
 
 from kubernetes import client, config
+from kubernetes.client import Configuration
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 
 logger = logging.getLogger(__name__)
 
+_configuration = Configuration()
+
 
 def _init_kubernetes_client() -> None:
     try:
-        config.load_incluster_config()
+        config.load_incluster_config(client_configuration=_configuration)
         logger.info("Using in-cluster Kubernetes configuration")
     except config.ConfigException:
         try:
-            config.load_kube_config()
+            config.load_kube_config(client_configuration=_configuration)
             logger.info("Using kubeconfig file for Kubernetes configuration")
         except config.ConfigException as e:
             logger.error("Failed to load Kubernetes configuration: %s", e)
@@ -23,7 +26,7 @@ def _init_kubernetes_client() -> None:
 
 _init_kubernetes_client()
 
-dynamic_client = DynamicClient(client.ApiClient())
+dynamic_client = DynamicClient(client.ApiClient(configuration=_configuration))
 
 _resource_api_cache: Dict[str, Optional[Any]] = {}
 

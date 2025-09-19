@@ -16,6 +16,7 @@ from starlette.templating import Jinja2Templates
 from .env import *
 from .mcp import *
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 mcp_app = mcp.http_app(path="/")
