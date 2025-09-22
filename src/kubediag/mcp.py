@@ -11,6 +11,56 @@ from .kubernetes import *
 
 logger = logging.getLogger(__name__)
 
+
+def validate_optional_string_param(value: Any, param_name: str) -> Optional[str]:
+    """
+    Validate and normalize optional string parameters to prevent AI models
+    from passing string representations of None/null.
+
+    Args:
+        value: The parameter value to validate
+        param_name: Name of the parameter for error messages
+
+    Returns:
+        Normalized value (None if empty/invalid, otherwise the string)
+
+    Raises:
+        ToolError: If validation fails
+    """
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise ToolError(f"{param_name} must be a string or null/None")
+
+    # Normalize common string representations of None/null
+    normalized = value.strip().lower()
+    if normalized in ("none", "null", ""):
+        return None
+
+    return value
+
+
+def validate_required_string_param(value: Any, param_name: str) -> str:
+    """
+    Validate required string parameters.
+
+    Args:
+        value: The parameter value to validate
+        param_name: Name of the parameter for error messages
+
+    Returns:
+        The validated string value
+
+    Raises:
+        ToolError: If validation fails
+    """
+    if not value or not isinstance(value, str):
+        raise ToolError(f"{param_name} must be a non-empty string")
+
+    return value
+
+
 mcp = FastMCP(
     "kubediag",
     version="1.0",
@@ -28,7 +78,7 @@ class KubernetesListResponse(BaseModel):
         name: str
 
     resource_type: ResourceType
-    namespace: str
+    namespace: Optional[str]
     names: List[str]
 
 
@@ -40,15 +90,19 @@ def kubernetes_list(
     ],
     namespace: Annotated[
         Optional[str],
-        "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
+        "Kubernetes namespace (default: 'default'). Use null/None for cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles'. Do not pass the string 'None' or 'null'.",
     ] = "default",
     selector: Annotated[
         Optional[str],
-        "Label selector to filter resources (e.g., 'app=myapp,env=production')",
+        "Label selector to filter resources (e.g., 'app=myapp,env=production'). Use null/None to list all resources without filtering. Do not pass the string 'None' or 'null'.",
     ] = None,
 ) -> KubernetesListResponse:
-    resource_type = (resource_type or "pods").lower()
-    namespace = namespace or "default"
+    # Validate and normalize parameters
+    resource_type = validate_required_string_param(
+        resource_type, "resource_type"
+    ).lower()
+    selector = validate_optional_string_param(selector, "selector")
+    namespace = validate_optional_string_param(namespace, "namespace") or "default"
 
     try:
         resource_api = get_resource_api(resource_type)
@@ -69,11 +123,18 @@ def kubernetes_list(
 
         names = extract_resource_names(result)
 
+        # Determine the actual namespace used (None for cluster-scoped resources)
+        actual_namespace = (
+            namespace
+            if hasattr(resource_api, "namespaced") and resource_api.namespaced
+            else None
+        )
+
         logger.info(
             "Listed %d %s resources in namespace %s",
             len(names),
             resource_type,
-            namespace,
+            actual_namespace or "cluster-scoped",
         )
         return KubernetesListResponse(
             resource_type=KubernetesListResponse.ResourceType(
@@ -82,7 +143,7 @@ def kubernetes_list(
                 name=resource_name,
             ),
             names=names,
-            namespace=namespace,
+            namespace=actual_namespace,
         )
     except ApiException as e:
         error_msg = (
@@ -105,11 +166,15 @@ def kubernetes_get(
     name: Annotated[str, "Name of the Kubernetes resource"],
     namespace: Annotated[
         Optional[str],
-        "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
+        "Kubernetes namespace (default: 'default'). Use null/None for cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles'. Do not pass the string 'None' or 'null'.",
     ] = "default",
 ) -> dict:
-    resource_type = (resource_type or "pods").lower()
-    namespace = namespace or "default"
+    # Validate and normalize parameters
+    resource_type = validate_required_string_param(
+        resource_type, "resource_type"
+    ).lower()
+    name = validate_required_string_param(name, "name")
+    namespace = validate_optional_string_param(namespace, "namespace") or "default"
 
     try:
         # Get the appropriate API resource
