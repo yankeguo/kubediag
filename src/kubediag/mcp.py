@@ -38,17 +38,13 @@ def kubernetes_list(
         str,
         "Kubernetes resource type in lowercase plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
     ],
-    namespace: Optional[
-        Annotated[
-            str,
-            "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
-        ]
+    namespace: Annotated[
+        Optional[str],
+        "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
     ] = "default",
-    selector: Optional[
-        Annotated[
-            str,
-            "Label selector to filter resources (e.g., 'app=myapp,env=production')",
-        ]
+    selector: Annotated[
+        Optional[str],
+        "Label selector to filter resources (e.g., 'app=myapp,env=production')",
     ] = None,
 ) -> KubernetesListResponse:
     resource_type = (resource_type or "pods").lower()
@@ -107,11 +103,9 @@ def kubernetes_get(
         "Kubernetes resource type in lowercase plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')",
     ],
     name: Annotated[str, "Name of the Kubernetes resource"],
-    namespace: Optional[
-        Annotated[
-            str,
-            "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
-        ]
+    namespace: Annotated[
+        Optional[str],
+        "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
     ] = "default",
 ) -> dict:
     resource_type = (resource_type or "pods").lower()
