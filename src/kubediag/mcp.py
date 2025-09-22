@@ -44,6 +44,12 @@ def kubernetes_list(
             "Kubernetes namespace (default: 'default'). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored",
         ]
     ] = "default",
+    selector: Optional[
+        Annotated[
+            str,
+            "Label selector to filter resources (e.g., 'app=myapp,env=production')",
+        ]
+    ] = None,
 ) -> KubernetesListResponse:
     resource_type = (resource_type or "pods").lower()
     namespace = namespace or "default"
@@ -61,9 +67,9 @@ def kubernetes_list(
         )
 
         if hasattr(resource_api, "namespaced") and resource_api.namespaced:
-            result = resource_api.get(namespace=namespace)
+            result = resource_api.get(namespace=namespace, label_selector=selector)
         else:
-            result = resource_api.get()
+            result = resource_api.get(label_selector=selector)
 
         names = extract_resource_names(result)
 
