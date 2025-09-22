@@ -133,15 +133,28 @@ List Kubernetes resources in a namespace using dynamic resource discovery.
 
 **Parameters:**
 
-- `namespace` (optional): Target namespace (default: "default")
-- `resource_type` (optional): Resource type - any valid Kubernetes resource name (plural form) like pods, services, deployments, configmaps, secrets, jobs, cronjobs, daemonsets, statefulsets, etc. (default: "pods")
+- `resource_type` (required): Kubernetes resource type in lowercase plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')
+- `namespace` (optional): Target namespace (default: "default"). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored
+- `selector` (optional): Label selector to filter resources (e.g., 'app=myapp,env=production')
 
-**Example:**
+**Examples:**
 
 ```python
-kubernetes_list(namespace="kube-system", resource_type="pods")
-kubernetes_list(namespace="default", resource_type="statefulsets")
-kubernetes_list(namespace="production", resource_type="cronjobs")
+# List all pods in default namespace
+kubernetes_list(resource_type="pods")
+
+# List pods in specific namespace
+kubernetes_list(resource_type="pods", namespace="kube-system")
+
+# List pods with specific labels
+kubernetes_list(resource_type="pods", namespace="production", selector="app=nginx")
+
+# List resources with multiple label selectors
+kubernetes_list(resource_type="deployments", namespace="default", selector="app=myapp,env=production")
+
+# List cluster-scoped resources
+kubernetes_list(resource_type="nodes")
+kubernetes_list(resource_type="namespaces")
 ```
 
 #### `kubernetes_get`
@@ -150,16 +163,25 @@ Get detailed information about a specific Kubernetes resource using dynamic reso
 
 **Parameters:**
 
-- `namespace` (optional): Target namespace (default: "default")
-- `resource_type` (optional): Resource type - any valid Kubernetes resource name (plural form) (default: "pods")
-- `name` (required): Name of the resource
+- `resource_type` (required): Kubernetes resource type in lowercase plural form (e.g., 'pods', 'services', 'deployments', 'configmaps', 'nodes', 'namespaces')
+- `name` (required): Name of the Kubernetes resource
+- `namespace` (optional): Target namespace (default: "default"). Note: For cluster-scoped resources like 'nodes', 'namespaces', 'clusterroles', this parameter is ignored
 
-**Example:**
+**Examples:**
 
 ```python
-kubernetes_get(namespace="default", resource_type="deployment", name="nginx-deployment")
-kubernetes_get(namespace="kube-system", resource_type="daemonset", name="kube-proxy")
-kubernetes_get(namespace="default", resource_type="ingress", name="web-ingress")
+# Get a deployment in default namespace
+kubernetes_get(resource_type="deployment", name="nginx-deployment")
+
+# Get a daemonset in kube-system namespace
+kubernetes_get(resource_type="daemonset", name="kube-proxy", namespace="kube-system")
+
+# Get an ingress resource
+kubernetes_get(resource_type="ingress", name="web-ingress", namespace="default")
+
+# Get cluster-scoped resources
+kubernetes_get(resource_type="node", name="worker-node-1")
+kubernetes_get(resource_type="namespace", name="production")
 ```
 
 ## Configuration
